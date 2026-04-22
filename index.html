@@ -1,0 +1,51 @@
+<html class=" idc0_343 zvbfbbgzzu"><head>
+    <title>DDraceNetwork Map Preview</title>
+    <meta name="viewport" content="width=device-width">
+    <style>
+      body {
+        margin: 0px;
+        overflow: hidden;
+        touch-action: none;
+        -ms-touch-action: none;
+      }
+      canvas#cnvs {
+        touch-action: none;
+        -ms-touch-action: none;
+      }
+    </style>
+  </head>
+  <body style="">
+    <script src="jquery-1.10.2.min.js"></script>
+    <script src="jquery.mousewheel.js"></script>
+    <script src="gl-matrix.js"></script>
+    <script src="crc32.min.js"></script>
+    <script src="zlib.min.js"></script>
+    <script src="dataviewext.js"></script>
+    <script src="twdatafile.js"></script>
+    <script src="twwebgl.js"></script>
+    <canvas id="cnvs" style="background: rgb(0, 0, 0);" width="599" height="947"></canvas>
+
+    <script>
+      $(document).ready(function() {
+
+          console.log(tw.getParams().map)
+          var params = tw.getParams();
+          if (params.map) {
+            tw.init({ mapUrl: params.map })
+          } else {
+            $("#fileSelect").css('visibility', 'visible');
+            $("#fileSelect").on('change', function(evt) {
+              var file = evt.target.files[0];
+
+              var reader = new FileReader();
+              reader.readAsArrayBuffer(file);
+
+              reader.onloadend = function(file) {
+                tw.init({ mapData: file.target.result})
+              }
+            })
+          }
+        }
+      );
+    </script>
+</body></html>
