@@ -24,10 +24,7 @@ tw.config = window.twConfig || {};
 tw.ZOOM_MIN = typeof tw.config.zoomMin === "number" ? tw.config.zoomMin : 0.2;
 tw.ZOOM_MAX = typeof tw.config.zoomMax === "number" ? tw.config.zoomMax : 6.0;
 tw.ZOOM_WHEEL_FACTOR = typeof tw.config.zoomWheelFactor === "number" ? tw.config.zoomWheelFactor : 10;
-tw.ZOOM_STEP_SCALE = typeof tw.config.zoomStepScale === "number" ? tw.config.zoomStepScale : 1.08;
-tw.ZOOM_SMOOTHING = typeof tw.config.zoomSmoothing === "number" ? tw.config.zoomSmoothing : 0.22;
 tw.ZOOM_SCROLL_GAIN = typeof tw.config.zoomScrollGain === "number" ? tw.config.zoomScrollGain : 0.05;
-tw.ZOOM_SCROLL_DAMPING = typeof tw.config.zoomScrollDamping === "number" ? tw.config.zoomScrollDamping : 0.82;
 tw.KEYBOARD_MOVE_SPEED_MIN = typeof tw.config.keyboardMoveSpeedMin === "number" ? tw.config.keyboardMoveSpeedMin : 6;
 tw.KEYBOARD_MOVE_SPEED_MAX = typeof tw.config.keyboardMoveSpeedMax === "number" ? tw.config.keyboardMoveSpeedMax : 18;
 tw.KEYBOARD_MOVE_RAMP_MS = typeof tw.config.keyboardMoveRampMs === "number" ? tw.config.keyboardMoveRampMs : 900;
@@ -75,6 +72,26 @@ tw.getKeyboardSpeed = function() {
         t = 0;
 
     return tw.KEYBOARD_MOVE_SPEED_MIN + (tw.KEYBOARD_MOVE_SPEED_MAX - tw.KEYBOARD_MOVE_SPEED_MIN) * t;
+}
+
+tw.updateZoomAnchor = function(event) {
+    if (!tw.canvas || !event)
+        return;
+
+    var rect = tw.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0)
+        return;
+
+    var x = (event.clientX - rect.left) / rect.width;
+    var y = (event.clientY - rect.top) / rect.height;
+
+    if (x < 0) x = 0;
+    if (x > 1) x = 1;
+    if (y < 0) y = 0;
+    if (y > 1) y = 1;
+
+    tw.zoomAnchor[0] = x;
+    tw.zoomAnchor[1] = y;
 }
 
 tw.clampZoom = function(value) {
@@ -170,7 +187,7 @@ tw.init = function(attrs) {
     tw.cameraPos = [0.0, 0.0]
     tw.cameraZoom = 1.0
     tw.cameraZoomTarget = tw.cameraZoom
-    tw.zoomScrollVelocity = 0
+    tw.zoomAnchor = [0.5, 0.5]
 
     // Mapscreen
     tw.mapScreen = vec4.create();
@@ -212,6 +229,8 @@ tw.init = function(attrs) {
     });
 
     $("#cnvs").mousemove(function(e) {
+        tw.updateZoomAnchor(e);
+
         if (tw.mousePressed) {
             tw.mouseDownInc[0] += tw.mouseLastPos[0] - e.clientX;
             tw.mouseDownInc[1] += tw.mouseLastPos[1] - e.clientY;
@@ -222,6 +241,8 @@ tw.init = function(attrs) {
     });
 
     $("#cnvs").mousewheel(function(event, delta, deltaX, deltaY) {
+        tw.updateZoomAnchor(event);
+
         var wheelDelta = Number(deltaY);
         if (!isFinite(wheelDelta) || wheelDelta === 0)
             wheelDelta = Number(delta);
@@ -234,7 +255,7 @@ tw.init = function(attrs) {
         if (wheelDelta < -1)
             wheelDelta = -1;
 
-        tw.zoomScrollVelocity += wheelDelta * tw.ZOOM_SCROLL_GAIN;
+        tw.cameraZoomTarget = tw.clampZoom(tw.cameraZoomTarget + wheelDelta * tw.ZOOM_SCROLL_GAIN * tw.cameraZoomTarget);
         tw.zoomed = true;
     });
 
@@ -1027,23 +1048,19 @@ tw.mainLoop = function() {
         dt = 16;
     tw.lastMainLoopTs = now;
 
-    if (tw.zoomScrollVelocity !== 0) {
-        var zoomFactor = 1 + tw.zoomScrollVelocity;
-        if (zoomFactor < 0.05)
-            zoomFactor = 0.05;
-        if (zoomFactor > 1.12)
-            zoomFactor = 1.12;
-        if (zoomFactor < 0.88)
-            zoomFactor = 0.88;
-        tw.cameraZoomTarget = tw.clampZoom(tw.cameraZoomTarget * zoomFactor);
-        tw.zoomScrollVelocity *= tw.ZOOM_SCROLL_DAMPING;
-        if (Math.abs(tw.zoomScrollVelocity) < 0.0001)
-            tw.zoomScrollVelocity = 0;
-    }
+    var prevZoom = tw.cameraZoom;
 
-    tw.cameraZoom += (tw.cameraZoomTarget - tw.cameraZoom) * tw.ZOOM_SMOOTHING;
-    if (Math.abs(tw.cameraZoomTarget - tw.cameraZoom) < 0.00001)
-        tw.cameraZoom = tw.cameraZoomTarget;
+    tw.cameraZoom = tw.cameraZoomTarget;
+
+    if (prevZoom !== tw.cameraZoom) {
+        var widthPrev = tw.worldView[0] * tw.aspect / prevZoom;
+        var widthNow = tw.worldView[0] * tw.aspect / tw.cameraZoom;
+        var heightPrev = tw.worldView[1] / prevZoom;
+        var heightNow = tw.worldView[1] / tw.cameraZoom;
+
+        tw.cameraPos[0] += (tw.zoomAnchor[0] - 0.5) * (widthPrev - widthNow);
+        tw.cameraPos[1] += (tw.zoomAnchor[1] - 0.5) * (heightPrev - heightNow);
+    }
 
     // Transform mouse coords to world coords
     tw.mouseDownInc[0] = tw.mouseDownInc[0] / tw.canvas.width * tw.worldView[0] * tw.aspect / tw.cameraZoom;
