@@ -105,6 +105,20 @@ tw.clampZoom = function (value) {
   return value;
 }
 
+tw.resetCameraToInitial = function () {
+  tw.cameraPos[0] = tw.initialCameraPos[0];
+  tw.cameraPos[1] = tw.initialCameraPos[1];
+  tw.cameraPosTarget[0] = tw.initialCameraPos[0];
+  tw.cameraPosTarget[1] = tw.initialCameraPos[1];
+  tw.cameraZoom = tw.initialCameraZoom;
+  tw.cameraZoomTarget = tw.initialCameraZoom;
+  tw.moveVelocity[0] = 0;
+  tw.moveVelocity[1] = 0;
+  tw.mouseDownInc[0] = 0;
+  tw.mouseDownInc[1] = 0;
+  tw.keyboardHoldMs = 0;
+}
+
 tw.init = function (attrs) {
   tw.canvas = document.getElementById("cnvs");
 
@@ -191,6 +205,8 @@ tw.init = function (attrs) {
   tw.cameraPosTarget = [0.0, 0.0]
   tw.cameraZoom = 1.0
   tw.cameraZoomTarget = tw.cameraZoom
+  tw.initialCameraPos = [0.0, 0.0]
+  tw.initialCameraZoom = tw.cameraZoom
   tw.zoomAnchor = [0.5, 0.5]
 
   // Mapscreen
@@ -224,6 +240,11 @@ tw.init = function (attrs) {
   $(document).on("keydown", function (e) {
     var key = (e.key || "").toLowerCase();
     tw.keyState[key] = true;
+    if (key === " " || key === "space" || key === "spacebar") {
+      tw.resetCameraToInitial();
+      e.preventDefault();
+      return;
+    }
     if (["arrowup", "arrowdown", "arrowleft", "arrowright"].indexOf(key) !== -1)
       e.preventDefault();
   });
@@ -656,6 +677,8 @@ tw.Map = function (mapData) {
                   tw.cameraPos[1] = y * 32;
                   tw.cameraPosTarget[0] = tw.cameraPos[0];
                   tw.cameraPosTarget[1] = tw.cameraPos[1];
+                  tw.initialCameraPos[0] = tw.cameraPos[0];
+                  tw.initialCameraPos[1] = tw.cameraPos[1];
                   first = false;
                   break;
                 }
