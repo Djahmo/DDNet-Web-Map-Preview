@@ -20,6 +20,71 @@ var tw = {
     MAPITEMTYPE_ENVPOINTS: 6,
 }
 
+tw.config = window.twConfig || {};
+tw.ZOOM_MIN = typeof tw.config.zoomMin === "number" ? tw.config.zoomMin : 0.2;
+tw.ZOOM_MAX = typeof tw.config.zoomMax === "number" ? tw.config.zoomMax : 6.0;
+tw.ZOOM_WHEEL_FACTOR = typeof tw.config.zoomWheelFactor === "number" ? tw.config.zoomWheelFactor : 10;
+tw.ZOOM_STEP_SCALE = typeof tw.config.zoomStepScale === "number" ? tw.config.zoomStepScale : 1.08;
+tw.ZOOM_SMOOTHING = typeof tw.config.zoomSmoothing === "number" ? tw.config.zoomSmoothing : 0.22;
+tw.ZOOM_SCROLL_GAIN = typeof tw.config.zoomScrollGain === "number" ? tw.config.zoomScrollGain : 0.05;
+tw.ZOOM_SCROLL_DAMPING = typeof tw.config.zoomScrollDamping === "number" ? tw.config.zoomScrollDamping : 0.82;
+tw.KEYBOARD_MOVE_SPEED_MIN = typeof tw.config.keyboardMoveSpeedMin === "number" ? tw.config.keyboardMoveSpeedMin : 6;
+tw.KEYBOARD_MOVE_SPEED_MAX = typeof tw.config.keyboardMoveSpeedMax === "number" ? tw.config.keyboardMoveSpeedMax : 18;
+tw.KEYBOARD_MOVE_RAMP_MS = typeof tw.config.keyboardMoveRampMs === "number" ? tw.config.keyboardMoveRampMs : 900;
+
+tw.keyState = {};
+
+tw.isMoveKeyPressed = function(keys) {
+    for (var i = 0; i < keys.length; i++) {
+        if (tw.keyState[keys[i]])
+            return true;
+    }
+    return false;
+}
+
+tw.getKeyboardMove = function() {
+    var dx = 0;
+    var dy = 0;
+
+    if (tw.isMoveKeyPressed(["a", "q", "arrowleft"]))
+        dx -= 1;
+    if (tw.isMoveKeyPressed(["d", "arrowright"]))
+        dx += 1;
+    if (tw.isMoveKeyPressed(["w", "z", "arrowup"]))
+        dy -= 1;
+    if (tw.isMoveKeyPressed(["s", "arrowdown"]))
+        dy += 1;
+
+    if (dx !== 0 && dy !== 0) {
+        var inv = Math.SQRT1_2;
+        dx *= inv;
+        dy *= inv;
+    }
+
+    return [dx, dy];
+}
+
+tw.getKeyboardSpeed = function() {
+    if (tw.KEYBOARD_MOVE_RAMP_MS <= 0)
+        return tw.KEYBOARD_MOVE_SPEED_MAX;
+
+    var t = tw.keyboardHoldMs / tw.KEYBOARD_MOVE_RAMP_MS;
+    if (t > 1)
+        t = 1;
+    if (t < 0)
+        t = 0;
+
+    return tw.KEYBOARD_MOVE_SPEED_MIN + (tw.KEYBOARD_MOVE_SPEED_MAX - tw.KEYBOARD_MOVE_SPEED_MIN) * t;
+}
+
+tw.clampZoom = function(value) {
+    if (value < tw.ZOOM_MIN)
+        return tw.ZOOM_MIN;
+    if (value > tw.ZOOM_MAX)
+        return tw.ZOOM_MAX;
+    return value;
+}
+
 tw.init = function(attrs) {
     tw.canvas = document.getElementById("cnvs");
 
@@ -104,6 +169,8 @@ tw.init = function(attrs) {
     // Camera
     tw.cameraPos = [0.0, 0.0]
     tw.cameraZoom = 1.0
+    tw.cameraZoomTarget = tw.cameraZoom
+    tw.zoomScrollVelocity = 0
 
     // Mapscreen
     tw.mapScreen = vec4.create();
@@ -115,6 +182,8 @@ tw.init = function(attrs) {
     tw.mouseDownPos = [0.0, 0.0]
     tw.mouseLastPos = [0.0, 0.0]
     tw.mouseDownInc = [0.0, 0.0]
+    tw.keyboardHoldMs = 0
+    tw.lastMainLoopTs = Date.now()
 
     // Mouse events
     $("#cnvs").mousedown(function(e) {
@@ -130,6 +199,18 @@ tw.init = function(attrs) {
         tw.mousePressed = false;
     });
 
+    $(document).on("keydown", function(e) {
+        var key = (e.key || "").toLowerCase();
+        tw.keyState[key] = true;
+        if (["arrowup", "arrowdown", "arrowleft", "arrowright"].indexOf(key) !== -1)
+            e.preventDefault();
+    });
+
+    $(document).on("keyup", function(e) {
+        var key = (e.key || "").toLowerCase();
+        tw.keyState[key] = false;
+    });
+
     $("#cnvs").mousemove(function(e) {
         if (tw.mousePressed) {
             tw.mouseDownInc[0] += tw.mouseLastPos[0] - e.clientX;
@@ -141,8 +222,19 @@ tw.init = function(attrs) {
     });
 
     $("#cnvs").mousewheel(function(event, delta, deltaX, deltaY) {
-        // Change camera zoom on mosewheel
-        tw.cameraZoom += deltaY * (tw.cameraZoom / 10);
+        var wheelDelta = Number(deltaY);
+        if (!isFinite(wheelDelta) || wheelDelta === 0)
+            wheelDelta = Number(delta);
+        if (!isFinite(wheelDelta))
+            return;
+
+        wheelDelta = wheelDelta / tw.ZOOM_WHEEL_FACTOR;
+        if (wheelDelta > 1)
+            wheelDelta = 1;
+        if (wheelDelta < -1)
+            wheelDelta = -1;
+
+        tw.zoomScrollVelocity += wheelDelta * tw.ZOOM_SCROLL_GAIN;
         tw.zoomed = true;
     });
 
@@ -176,7 +268,7 @@ tw.init = function(attrs) {
         if (tw.touchScaling) {
             var prev = tw.touchDistance;
             tw.touchDistance = getDistance(e);
-            tw.cameraZoom = (tw.touchDistance / prev) * tw.cameraZoom;
+            tw.cameraZoomTarget = tw.clampZoom((tw.touchDistance / prev) * tw.cameraZoomTarget);
         }
     });
 
@@ -929,6 +1021,30 @@ tw.buildShader = function(str, type) {
 }
 
 tw.mainLoop = function() {
+    var now = Date.now();
+    var dt = now - tw.lastMainLoopTs;
+    if (dt < 0 || dt > 250)
+        dt = 16;
+    tw.lastMainLoopTs = now;
+
+    if (tw.zoomScrollVelocity !== 0) {
+        var zoomFactor = 1 + tw.zoomScrollVelocity;
+        if (zoomFactor < 0.05)
+            zoomFactor = 0.05;
+        if (zoomFactor > 1.12)
+            zoomFactor = 1.12;
+        if (zoomFactor < 0.88)
+            zoomFactor = 0.88;
+        tw.cameraZoomTarget = tw.clampZoom(tw.cameraZoomTarget * zoomFactor);
+        tw.zoomScrollVelocity *= tw.ZOOM_SCROLL_DAMPING;
+        if (Math.abs(tw.zoomScrollVelocity) < 0.0001)
+            tw.zoomScrollVelocity = 0;
+    }
+
+    tw.cameraZoom += (tw.cameraZoomTarget - tw.cameraZoom) * tw.ZOOM_SMOOTHING;
+    if (Math.abs(tw.cameraZoomTarget - tw.cameraZoom) < 0.00001)
+        tw.cameraZoom = tw.cameraZoomTarget;
+
     // Transform mouse coords to world coords
     tw.mouseDownInc[0] = tw.mouseDownInc[0] / tw.canvas.width * tw.worldView[0] * tw.aspect / tw.cameraZoom;
     tw.mouseDownInc[1] = tw.mouseDownInc[1] / tw.canvas.height * tw.worldView[1] / tw.cameraZoom;
@@ -936,6 +1052,16 @@ tw.mainLoop = function() {
     // Move camera
     tw.cameraPos[0] += tw.mouseDownInc[0];
     tw.cameraPos[1] += tw.mouseDownInc[1];
+
+    var move = tw.getKeyboardMove();
+    if (move[0] !== 0 || move[1] !== 0)
+        tw.keyboardHoldMs += dt;
+    else
+        tw.keyboardHoldMs = 0;
+
+    var keyboardSpeed = tw.getKeyboardSpeed();
+    tw.cameraPos[0] += move[0] * (keyboardSpeed / tw.cameraZoom);
+    tw.cameraPos[1] += move[1] * (keyboardSpeed / tw.cameraZoom);
 
     tw.mouseDownInc[0] = 0;
     tw.mouseDownInc[1] = 0;
