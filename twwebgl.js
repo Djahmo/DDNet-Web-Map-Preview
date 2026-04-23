@@ -25,6 +25,9 @@ tw.ZOOM_MIN = typeof tw.config.zoomMin === "number" ? tw.config.zoomMin : 0.2;
 tw.ZOOM_MAX = typeof tw.config.zoomMax === "number" ? tw.config.zoomMax : 6.0;
 tw.ZOOM_WHEEL_FACTOR = typeof tw.config.zoomWheelFactor === "number" ? tw.config.zoomWheelFactor : 10;
 tw.ZOOM_SCROLL_GAIN = typeof tw.config.zoomScrollGain === "number" ? tw.config.zoomScrollGain : 0.05;
+tw.MOVE_SMOOTHING = typeof tw.config.moveSmoothing === "number" ? tw.config.moveSmoothing : 0.22;
+tw.MOVE_ACCELERATION = typeof tw.config.moveAcceleration === "number" ? tw.config.moveAcceleration : 0.35;
+tw.MOVE_DECELERATION = typeof tw.config.moveDeceleration === "number" ? tw.config.moveDeceleration : 0.86;
 tw.KEYBOARD_MOVE_SPEED_MIN = typeof tw.config.keyboardMoveSpeedMin === "number" ? tw.config.keyboardMoveSpeedMin : 6;
 tw.KEYBOARD_MOVE_SPEED_MAX = typeof tw.config.keyboardMoveSpeedMax === "number" ? tw.config.keyboardMoveSpeedMax : 18;
 tw.KEYBOARD_MOVE_RAMP_MS = typeof tw.config.keyboardMoveRampMs === "number" ? tw.config.keyboardMoveRampMs : 900;
@@ -185,6 +188,7 @@ tw.init = function(attrs) {
 
     // Camera
     tw.cameraPos = [0.0, 0.0]
+    tw.cameraPosTarget = [0.0, 0.0]
     tw.cameraZoom = 1.0
     tw.cameraZoomTarget = tw.cameraZoom
     tw.zoomAnchor = [0.5, 0.5]
@@ -199,6 +203,7 @@ tw.init = function(attrs) {
     tw.mouseDownPos = [0.0, 0.0]
     tw.mouseLastPos = [0.0, 0.0]
     tw.mouseDownInc = [0.0, 0.0]
+    tw.moveVelocity = [0.0, 0.0]
     tw.keyboardHoldMs = 0
     tw.lastMainLoopTs = Date.now()
 
@@ -637,6 +642,8 @@ tw.Map = function(mapData) {
                                 if (t.index == 192) {
                                     tw.cameraPos[0] = x * 32;
                                     tw.cameraPos[1] = y * 32;
+                                    tw.cameraPosTarget[0] = tw.cameraPos[0];
+                                    tw.cameraPosTarget[1] = tw.cameraPos[1];
                                     first = false;
                                     break;
                                 }
@@ -1058,17 +1065,17 @@ tw.mainLoop = function() {
         var heightPrev = tw.worldView[1] / prevZoom;
         var heightNow = tw.worldView[1] / tw.cameraZoom;
 
-        tw.cameraPos[0] += (tw.zoomAnchor[0] - 0.5) * (widthPrev - widthNow);
-        tw.cameraPos[1] += (tw.zoomAnchor[1] - 0.5) * (heightPrev - heightNow);
+        var zoomOffsetX = (tw.zoomAnchor[0] - 0.5) * (widthPrev - widthNow);
+        var zoomOffsetY = (tw.zoomAnchor[1] - 0.5) * (heightPrev - heightNow);
+        tw.cameraPos[0] += zoomOffsetX;
+        tw.cameraPos[1] += zoomOffsetY;
+        tw.cameraPosTarget[0] += zoomOffsetX;
+        tw.cameraPosTarget[1] += zoomOffsetY;
     }
 
     // Transform mouse coords to world coords
     tw.mouseDownInc[0] = tw.mouseDownInc[0] / tw.canvas.width * tw.worldView[0] * tw.aspect / tw.cameraZoom;
     tw.mouseDownInc[1] = tw.mouseDownInc[1] / tw.canvas.height * tw.worldView[1] / tw.cameraZoom;
-
-    // Move camera
-    tw.cameraPos[0] += tw.mouseDownInc[0];
-    tw.cameraPos[1] += tw.mouseDownInc[1];
 
     var move = tw.getKeyboardMove();
     if (move[0] !== 0 || move[1] !== 0)
@@ -1077,8 +1084,26 @@ tw.mainLoop = function() {
         tw.keyboardHoldMs = 0;
 
     var keyboardSpeed = tw.getKeyboardSpeed();
-    tw.cameraPos[0] += move[0] * (keyboardSpeed / tw.cameraZoom);
-    tw.cameraPos[1] += move[1] * (keyboardSpeed / tw.cameraZoom);
+    var inputMoveX = tw.mouseDownInc[0] + move[0] * (keyboardSpeed / tw.cameraZoom);
+    var inputMoveY = tw.mouseDownInc[1] + move[1] * (keyboardSpeed / tw.cameraZoom);
+
+    if (inputMoveX !== 0 || inputMoveY !== 0) {
+        tw.moveVelocity[0] += (inputMoveX - tw.moveVelocity[0]) * tw.MOVE_ACCELERATION;
+        tw.moveVelocity[1] += (inputMoveY - tw.moveVelocity[1]) * tw.MOVE_ACCELERATION;
+    } else {
+        tw.moveVelocity[0] *= tw.MOVE_DECELERATION;
+        tw.moveVelocity[1] *= tw.MOVE_DECELERATION;
+        if (Math.abs(tw.moveVelocity[0]) < 0.0001)
+            tw.moveVelocity[0] = 0;
+        if (Math.abs(tw.moveVelocity[1]) < 0.0001)
+            tw.moveVelocity[1] = 0;
+    }
+
+    tw.cameraPosTarget[0] += tw.moveVelocity[0];
+    tw.cameraPosTarget[1] += tw.moveVelocity[1];
+
+    tw.cameraPos[0] += (tw.cameraPosTarget[0] - tw.cameraPos[0]) * tw.MOVE_SMOOTHING;
+    tw.cameraPos[1] += (tw.cameraPosTarget[1] - tw.cameraPos[1]) * tw.MOVE_SMOOTHING;
 
     tw.mouseDownInc[0] = 0;
     tw.mouseDownInc[1] = 0;
