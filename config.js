@@ -1,6 +1,9 @@
 window.twConfig = {
-  zoomMin: 0.05,
-  zoomMax: 6.0,
+  enableExternalMapLoading: false,
+  remoteMapBaseUrl: "https://ddnet.org/mappreview/",
+  defaultMapUrl: "Tutorial",
+  zoomMin: 0.01,
+  zoomMax: 10.0,
   zoomWheelFactor: 14,
   zoomScrollGain: 0.2,
   moveSmoothing: 0.22,

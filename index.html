@@ -47,20 +47,33 @@
 
           console.log(tw.getParams().map)
           var params = tw.getParams();
-          if (params.map) {
-            tw.init({ mapUrl: params.map })
-          } else {
-            $("#fileSelect").css('visibility', 'visible');
-            $("#fileSelect").on('change', function(evt) {
-              var file = evt.target.files[0];
+          var paramMap = params.map;
+          var cfg = window.twConfig || {};
+          var enableExternalMapLoading = cfg.enableExternalMapLoading === true;
+          var remoteBaseUrl = cfg.remoteMapBaseUrl || "https://ddnet.org/mappreview/";
+          var mapUrl = cfg.defaultMapUrl;
 
-              var reader = new FileReader();
-              reader.readAsArrayBuffer(file);
-
-              reader.onloadend = function(file) {
-                tw.init({ mapData: file.target.result})
+          if (typeof paramMap === 'string' && paramMap.length > 0) {
+            if (/^https?:\/\//i.test(paramMap)) {
+              if (enableExternalMapLoading) {
+                mapUrl = paramMap;
+              } else {
+                console.log("External map loading is disabled by config.")
               }
-            })
+            } else {
+              if (enableExternalMapLoading) {
+                var normalized = paramMap.replace(/^\/+/, '');
+                mapUrl = remoteBaseUrl.replace(/\/+$/, '/') + normalized;
+              } else {
+                mapUrl = paramMap;
+              }
+            }
+          }
+
+          if (mapUrl) {
+            tw.init({ mapUrl: mapUrl })
+          } else {
+            console.log("No map URL provided. Use ?map=... or twConfig.defaultMapUrl")
           }
         }
       );

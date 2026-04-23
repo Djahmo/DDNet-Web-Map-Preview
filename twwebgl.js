@@ -316,13 +316,25 @@ tw.init = function(attrs) {
         this.map = new tw.Map(attrs.mapData);
         tw.mainLoop();
     } else if (attrs.mapUrl) {
+        var mapUrl = attrs.mapUrl;
+        if (!/\.map($|[?#])/i.test(mapUrl))
+            mapUrl += ".map";
+
         var req = new XMLHttpRequest();
-        req.open("GET", attrs.mapUrl + ".map", true);
+        req.open("GET", mapUrl, true);
         req.responseType = "arraybuffer";
 
         req.onload = function(evt) {
+            if (!evt.target.response) {
+                console.log("couldn't load map from url", mapUrl);
+                return;
+            }
             me.map = new tw.Map(evt.target.response);
             tw.mainLoop();
+        }
+
+        req.onerror = function() {
+            console.log("map request failed", mapUrl);
         }
 
         req.send(null);
