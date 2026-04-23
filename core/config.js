@@ -1,5 +1,5 @@
 window.twConfig = {
-  enableExternalMapLoading: false,
+  enableExternalMapLoading: true,
   remoteMapBaseUrl: "https://ddnet.org/mappreview/",
   defaultMapUrl: "Tutorial",
   zoomMin: 0.01,
