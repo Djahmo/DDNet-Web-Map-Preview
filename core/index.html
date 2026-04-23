@@ -1,86 +1,43 @@
-<html class=" idc0_343 zvbfbbgzzu"><head>
-    <title>DDraceNetwork Map Preview</title>
-    <meta name="viewport" content="width=device-width">
-    <style>
-      html,
-      body {
-        margin: 0px;
-        width: 100%;
-        height: 100%;
-        position: fixed;
-        overflow: hidden;
-        overscroll-behavior: none;
-        touch-action: none;
-        -ms-touch-action: none;
-      }
-      canvas#cnvs {
-        display: block;
-        width: 100%;
-        height: 100%;
-        touch-action: none;
-        -ms-touch-action: none;
-      }
-    </style>
-  </head>
-  <body>
-    <script src="jquery-1.10.2.min.js"></script>
-    <script src="jquery.mousewheel.js"></script>
-    <script src="gl-matrix.js"></script>
-    <script src="crc32.min.js"></script>
-    <script src="zlib.min.js"></script>
-    <script src="dataviewext.js"></script>
-    <script src="twdatafile.js"></script>
-    <script src="config.js"></script>
-    <script src="twwebgl.js"></script>
-    <canvas id="cnvs" style="background: rgb(0, 0, 0);" width="599" height="947"></canvas>
+<html class=" idc0_343 zvbfbbgzzu">
 
-    <script>
-      $(document).ready(function() {
+<head>
+  <title>DDraceNetwork Map Preview</title>
+  <meta name="viewport" content="width=device-width">
+  <style>
+    html,
+    body {
+      margin: 0px;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      -ms-touch-action: none;
+    }
 
-          window.addEventListener('wheel', function(e) {
-            e.preventDefault();
-          }, { passive: false });
+    canvas#cnvs {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      -ms-touch-action: none;
+    }
+  </style>
+</head>
 
-          window.addEventListener('touchmove', function(e) {
-            e.preventDefault();
-          }, { passive: false });
+<body>
+  <script src="jquery-1.10.2.min.js"></script>
+  <script src="jquery.mousewheel.js"></script>
+  <script src="gl-matrix.js"></script>
+  <script src="crc32.min.js"></script>
+  <script src="zlib.min.js"></script>
+  <script src="dataviewext.js"></script>
+  <script src="twdatafile.js"></script>
+  <script src="config.js"></script>
+  <script src="twwebgl.js"></script>
+  <script src="bootstrap.js"></script>
+  <canvas id="cnvs" style="background: rgb(0, 0, 0);" width="599" height="947"></canvas>
+</body>
 
-          console.log(tw.getParams().map)
-          var params = tw.getParams();
-          var paramMap = params.map;
-          var cfg = window.twConfig || {};
-          var enableExternalMapLoading = cfg.enableExternalMapLoading === true;
-          var remoteBaseUrl = cfg.remoteMapBaseUrl || "https://ddnet.org/mappreview/";
-          var mapUrl = cfg.defaultMapUrl;
-
-          if (enableExternalMapLoading && typeof mapUrl === 'string' && mapUrl.length > 0 && !/^https?:\/\//i.test(mapUrl)) {
-            var defaultNormalized = mapUrl.replace(/^\/+/, '');
-            mapUrl = remoteBaseUrl.replace(/\/+$/, '/') + defaultNormalized;
-          }
-
-          if (typeof paramMap === 'string' && paramMap.length > 0) {
-            if (/^https?:\/\//i.test(paramMap)) {
-              if (enableExternalMapLoading) {
-                mapUrl = paramMap;
-              } else {
-                console.log("External map loading is disabled by config.")
-              }
-            } else {
-              if (enableExternalMapLoading) {
-                var normalized = paramMap.replace(/^\/+/, '');
-                mapUrl = remoteBaseUrl.replace(/\/+$/, '/') + normalized;
-              } else {
-                mapUrl = paramMap;
-              }
-            }
-          }
-
-          if (mapUrl) {
-            tw.init({ mapUrl: mapUrl })
-          } else {
-            console.log("No map URL provided. Use ?map=... or twConfig.defaultMapUrl")
-          }
-        }
-      );
-    </script>
-</body></html>
+</html>
