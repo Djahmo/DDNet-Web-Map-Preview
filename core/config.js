@@ -11,6 +11,7 @@ window.twConfig = {
   zoomWheelStep: 1.08,
   zoomWheelMaxStepsPerEvent: 8,
   zoomWheelLineHeight: 16,
+  zoomWheelLowDeltaGamma: 0.55,
   moveSmoothing: 0.22,
   moveAcceleration: 0.35,
   moveDeceleration: 0.86,

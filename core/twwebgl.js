@@ -29,6 +29,7 @@ tw.ZOOM_WHEEL_PIXEL_QUANTUM = typeof tw.config.zoomWheelPixelQuantum === "number
 tw.ZOOM_WHEEL_STEP = typeof tw.config.zoomWheelStep === "number" ? tw.config.zoomWheelStep : 1.08;
 tw.ZOOM_WHEEL_MAX_STEPS_PER_EVENT = typeof tw.config.zoomWheelMaxStepsPerEvent === "number" ? tw.config.zoomWheelMaxStepsPerEvent : 8;
 tw.ZOOM_WHEEL_LINE_HEIGHT = typeof tw.config.zoomWheelLineHeight === "number" ? tw.config.zoomWheelLineHeight : 16;
+tw.ZOOM_WHEEL_LOW_DELTA_GAMMA = typeof tw.config.zoomWheelLowDeltaGamma === "number" ? tw.config.zoomWheelLowDeltaGamma : 0.55;
 tw.EXTERNAL_IMAGE_BASE_URL = typeof tw.config.localImageUrl === "string" ? tw.config.localImageUrl : "https://preview.ddhost.cc/i/";
 tw.MOVE_SMOOTHING = typeof tw.config.moveSmoothing === "number" ? tw.config.moveSmoothing : 0.22;
 tw.MOVE_ACCELERATION = typeof tw.config.moveAcceleration === "number" ? tw.config.moveAcceleration : 0.35;
@@ -304,29 +305,28 @@ tw.init = function (attrs) {
     if (!isFinite(pixelDelta) || pixelDelta === 0)
       return;
 
-    tw.zoomWheelAccum += pixelDelta;
-
     var quantum = tw.ZOOM_WHEEL_PIXEL_QUANTUM;
     if (!isFinite(quantum) || quantum <= 0)
       quantum = 120;
 
-    var stepCount = 0;
+    var gamma = tw.ZOOM_WHEEL_LOW_DELTA_GAMMA;
+    if (!isFinite(gamma) || gamma <= 0 || gamma >= 1)
+      gamma = 0.55;
+
+    var absDelta = Math.abs(pixelDelta);
+    if (absDelta > 0 && absDelta < quantum)
+      pixelDelta = (pixelDelta < 0 ? -1 : 1) * quantum * Math.pow(absDelta / quantum, gamma);
+
     var maxSteps = Math.max(1, Math.floor(tw.ZOOM_WHEEL_MAX_STEPS_PER_EVENT));
-    while (Math.abs(tw.zoomWheelAccum) >= quantum && Math.abs(stepCount) < maxSteps) {
-      if (tw.zoomWheelAccum > 0) {
-        stepCount += 1;
-        tw.zoomWheelAccum -= quantum;
-      } else {
-        stepCount -= 1;
-        tw.zoomWheelAccum += quantum;
-      }
-    }
+    var maxPixels = quantum * maxSteps;
+    if (pixelDelta > maxPixels)
+      pixelDelta = maxPixels;
+    if (pixelDelta < -maxPixels)
+      pixelDelta = -maxPixels;
 
-    if (stepCount === 0)
-      return;
-
-    var zoomFactor = Math.pow(tw.ZOOM_WHEEL_STEP, stepCount);
+    var zoomFactor = Math.pow(tw.ZOOM_WHEEL_STEP, pixelDelta / quantum);
     tw.cameraZoomTarget = tw.clampZoom(tw.cameraZoomTarget * zoomFactor);
+    tw.zoomWheelAccum = 0;
     tw.zoomed = true;
   });
 
