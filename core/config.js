@@ -1,6 +1,7 @@
 window.twConfig = {
   enableExternalMapLoading: true,
   remoteMapBaseUrl: "https://ddnet.org/mappreview/",
+  localImageUrl: "https://preview.ddhost.cc/i/",
   defaultMapUrl: "Tutorial",
   zoomMin: 0.01,
   zoomMax: 10.0,

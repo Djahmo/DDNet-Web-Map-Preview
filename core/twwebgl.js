@@ -29,7 +29,7 @@ tw.ZOOM_WHEEL_PIXEL_QUANTUM = typeof tw.config.zoomWheelPixelQuantum === "number
 tw.ZOOM_WHEEL_STEP = typeof tw.config.zoomWheelStep === "number" ? tw.config.zoomWheelStep : 1.08;
 tw.ZOOM_WHEEL_MAX_STEPS_PER_EVENT = typeof tw.config.zoomWheelMaxStepsPerEvent === "number" ? tw.config.zoomWheelMaxStepsPerEvent : 8;
 tw.ZOOM_WHEEL_LINE_HEIGHT = typeof tw.config.zoomWheelLineHeight === "number" ? tw.config.zoomWheelLineHeight : 16;
-tw.EXTERNAL_IMAGE_BASE_URL = /i/
+tw.EXTERNAL_IMAGE_BASE_URL = typeof tw.config.localImageUrl === "string" ? tw.config.localImageUrl : "https://preview.ddhost.cc/i/";
 tw.MOVE_SMOOTHING = typeof tw.config.moveSmoothing === "number" ? tw.config.moveSmoothing : 0.22;
 tw.MOVE_ACCELERATION = typeof tw.config.moveAcceleration === "number" ? tw.config.moveAcceleration : 0.35;
 tw.MOVE_DECELERATION = typeof tw.config.moveDeceleration === "number" ? tw.config.moveDeceleration : 0.86;
