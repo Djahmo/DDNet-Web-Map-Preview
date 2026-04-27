@@ -22,7 +22,7 @@ TwDataFile.prototype.parse = function () {
   this.version = data.uint32();
 
   // calculate checksum
-  this.crc = Zlib.CRC32.calc(new Uint8Array(this.fileData), 0, this.fileData.byteLength)
+  this.crc = CRC32.buf(new Uint8Array(this.fileData))
   console.log("crc", this.crc.toString(16))
 
   // we only support datafile version 4
