@@ -4,7 +4,7 @@ window.twConfig = {
   defaultMapUrl: "Tutorial",
   zoomMin: 0.01,
   zoomMax: 10.0,
-  zoomWheelFactor: 14,
+  zoomWheelFactor: 50,
   zoomScrollGain: 0.2,
   moveSmoothing: 0.22,
   moveAcceleration: 0.35,
