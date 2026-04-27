@@ -21,6 +21,8 @@ var tw = {
 }
 
 tw.config = window.twConfig || {};
+tw.mat4 = window.glMatrix && window.glMatrix.mat4 ? window.glMatrix.mat4 : window.mat4;
+tw.vec4 = window.glMatrix && window.glMatrix.vec4 ? window.glMatrix.vec4 : window.vec4;
 tw.ZOOM_MIN = typeof tw.config.zoomMin === "number" ? tw.config.zoomMin : 0.2;
 tw.ZOOM_MAX = typeof tw.config.zoomMax === "number" ? tw.config.zoomMax : 6.0;
 tw.ZOOM_WHEEL_FACTOR = typeof tw.config.zoomWheelFactor === "number" ? tw.config.zoomWheelFactor : 10;
@@ -198,12 +200,12 @@ tw.init = function (attrs) {
   tw.aspect = 1;
 
   // Matrices
-  tw.prjMat = mat4.create();
-  tw.mvMat = mat4.create();
+  tw.prjMat = tw.mat4.create();
+  tw.mvMat = tw.mat4.create();
 
   // Temp objects
-  tw.tmpMat = mat4.create();
-  tw.tmpVec4 = vec4.create();
+  tw.tmpMat = tw.mat4.create();
+  tw.tmpVec4 = tw.vec4.create();
   tw.tmpBuf = tw.gl.createBuffer();
 
   // Camera
@@ -216,7 +218,7 @@ tw.init = function (attrs) {
   tw.zoomAnchor = [0.5, 0.5]
 
   // Mapscreen
-  tw.mapScreen = vec4.create();
+  tw.mapScreen = tw.vec4.create();
   tw.worldView = [1000, 1000];
 
   tw.screenResize();
@@ -966,7 +968,7 @@ tw.Map.Group.prototype.initMapScreen = function () {
 
 tw.initPrjMat = function () {
   // Init projection matrix
-  mat4.ortho(tw.prjMat, tw.mapScreen[0], tw.mapScreen[2], tw.mapScreen[3], tw.mapScreen[1], 1, -1);
+  tw.mat4.ortho(tw.prjMat, tw.mapScreen[0], tw.mapScreen[2], tw.mapScreen[3], tw.mapScreen[1], 1, -1);
   tw.setMatUniforms();
 }
 
@@ -1228,8 +1230,8 @@ tw.render = function () {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   // reset matrices
-  mat4.identity(tw.mvMat);
-  mat4.identity(tw.prjMat);
+  tw.mat4.identity(tw.mvMat);
+  tw.mat4.identity(tw.prjMat);
 
   // enable texture 0
   gl.activeTexture(gl.TEXTURE0);
@@ -1433,12 +1435,12 @@ tw.TileLayer.prototype.render = function () {
   tw.sVertexColor(0);
 
   // MapTile resize
-  mat4.copy(tw.tmpMat, tw.mvMat);
-  mat4.scale(tw.mvMat, tw.mvMat, [32, 32, 0.0]);
+  tw.mat4.copy(tw.tmpMat, tw.mvMat);
+  tw.mat4.scale(tw.mvMat, tw.mvMat, [32, 32, 0.0]);
   tw.setMatUniforms();
 
   // Set color mask
-  vec4.set(tw.tmpVec4, this.color[0], this.color[1], this.color[2], this.color[3]);
+  tw.vec4.set(tw.tmpVec4, this.color[0], this.color[1], this.color[2], this.color[3]);
   tw.setColorMask(tw.tmpVec4);
 
   // Vertex attribute
@@ -1450,7 +1452,7 @@ tw.TileLayer.prototype.render = function () {
   tw.gl.drawArrays(tw.gl.TRIANGLES, 0, this.numTiles * 6);
 
   // Get old mvMat
-  mat4.copy(tw.mvMat, tw.tmpMat);
+  tw.mat4.copy(tw.mvMat, tw.tmpMat);
 
   // keep textures disabled by default
   tw.sTexCoords(0);
