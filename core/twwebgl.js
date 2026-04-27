@@ -25,6 +25,11 @@ tw.ZOOM_MIN = typeof tw.config.zoomMin === "number" ? tw.config.zoomMin : 0.2;
 tw.ZOOM_MAX = typeof tw.config.zoomMax === "number" ? tw.config.zoomMax : 6.0;
 tw.ZOOM_WHEEL_FACTOR = typeof tw.config.zoomWheelFactor === "number" ? tw.config.zoomWheelFactor : 10;
 tw.ZOOM_SCROLL_GAIN = typeof tw.config.zoomScrollGain === "number" ? tw.config.zoomScrollGain : 0.05;
+tw.ZOOM_WHEEL_PIXEL_QUANTUM = typeof tw.config.zoomWheelPixelQuantum === "number" ? tw.config.zoomWheelPixelQuantum : 120;
+tw.ZOOM_WHEEL_STEP = typeof tw.config.zoomWheelStep === "number" ? tw.config.zoomWheelStep : 1.08;
+tw.ZOOM_WHEEL_MAX_STEPS_PER_EVENT = typeof tw.config.zoomWheelMaxStepsPerEvent === "number" ? tw.config.zoomWheelMaxStepsPerEvent : 8;
+tw.ZOOM_WHEEL_LINE_HEIGHT = typeof tw.config.zoomWheelLineHeight === "number" ? tw.config.zoomWheelLineHeight : 16;
+tw.EXTERNAL_IMAGE_BASE_URL = /i/
 tw.MOVE_SMOOTHING = typeof tw.config.moveSmoothing === "number" ? tw.config.moveSmoothing : 0.22;
 tw.MOVE_ACCELERATION = typeof tw.config.moveAcceleration === "number" ? tw.config.moveAcceleration : 0.35;
 tw.MOVE_DECELERATION = typeof tw.config.moveDeceleration === "number" ? tw.config.moveDeceleration : 0.86;
@@ -221,6 +226,7 @@ tw.init = function (attrs) {
   tw.mouseDownInc = [0.0, 0.0]
   tw.moveVelocity = [0.0, 0.0]
   tw.keyboardHoldMs = 0
+  tw.zoomWheelAccum = 0
   tw.lastMainLoopTs = Date.now()
 
   // Mouse events
@@ -269,19 +275,58 @@ tw.init = function (attrs) {
   $("#cnvs").mousewheel(function (event, delta, deltaX, deltaY) {
     tw.updateZoomAnchor(event);
 
-    var wheelDelta = Number(deltaY);
-    if (!isFinite(wheelDelta) || wheelDelta === 0)
-      wheelDelta = Number(delta);
-    if (!isFinite(wheelDelta))
+    var orgEvent = event.originalEvent || event;
+    var pixelDelta = 0;
+
+    if (typeof orgEvent.deltaY === "number" && isFinite(orgEvent.deltaY)) {
+      pixelDelta = -orgEvent.deltaY;
+      if (orgEvent.deltaMode === 1)
+        pixelDelta *= tw.ZOOM_WHEEL_LINE_HEIGHT;
+      else if (orgEvent.deltaMode === 2)
+        pixelDelta *= (tw.canvas && tw.canvas.height) ? tw.canvas.height : window.innerHeight;
+    } else if (typeof orgEvent.wheelDeltaY === "number" && isFinite(orgEvent.wheelDeltaY)) {
+      pixelDelta = orgEvent.wheelDeltaY;
+    } else if (typeof orgEvent.wheelDelta === "number" && isFinite(orgEvent.wheelDelta)) {
+      pixelDelta = orgEvent.wheelDelta;
+    } else if (typeof orgEvent.detail === "number" && isFinite(orgEvent.detail)) {
+      pixelDelta = orgEvent.detail * -40;
+    } else {
+      var fallbackDeltaY = Number(deltaY);
+      if (isFinite(fallbackDeltaY) && fallbackDeltaY !== 0)
+        pixelDelta = fallbackDeltaY * tw.ZOOM_WHEEL_PIXEL_QUANTUM;
+      else {
+        var fallbackDelta = Number(delta);
+        if (isFinite(fallbackDelta))
+          pixelDelta = fallbackDelta * tw.ZOOM_WHEEL_PIXEL_QUANTUM;
+      }
+    }
+
+    if (!isFinite(pixelDelta) || pixelDelta === 0)
       return;
 
-    wheelDelta = wheelDelta / tw.ZOOM_WHEEL_FACTOR;
-    if (wheelDelta > 1)
-      wheelDelta = 1;
-    if (wheelDelta < -1)
-      wheelDelta = -1;
+    tw.zoomWheelAccum += pixelDelta;
 
-    tw.cameraZoomTarget = tw.clampZoom(tw.cameraZoomTarget + wheelDelta * tw.ZOOM_SCROLL_GAIN * tw.cameraZoomTarget);
+    var quantum = tw.ZOOM_WHEEL_PIXEL_QUANTUM;
+    if (!isFinite(quantum) || quantum <= 0)
+      quantum = 120;
+
+    var stepCount = 0;
+    var maxSteps = Math.max(1, Math.floor(tw.ZOOM_WHEEL_MAX_STEPS_PER_EVENT));
+    while (Math.abs(tw.zoomWheelAccum) >= quantum && Math.abs(stepCount) < maxSteps) {
+      if (tw.zoomWheelAccum > 0) {
+        stepCount += 1;
+        tw.zoomWheelAccum -= quantum;
+      } else {
+        stepCount -= 1;
+        tw.zoomWheelAccum += quantum;
+      }
+    }
+
+    if (stepCount === 0)
+      return;
+
+    var zoomFactor = Math.pow(tw.ZOOM_WHEEL_STEP, stepCount);
+    tw.cameraZoomTarget = tw.clampZoom(tw.cameraZoomTarget * zoomFactor);
     tw.zoomed = true;
   });
 
@@ -616,6 +661,11 @@ tw.Map = function (mapData) {
     if (imgInfo.external) {
       // load external texture
       var url = imgName + ".png";
+      if (!/^https?:\/\//i.test(url)) {
+        var baseUrl = tw.EXTERNAL_IMAGE_BASE_URL.replace(/\/+$/, "/");
+        var normalizedUrl = url.replace(/^\/+/, "");
+        url = baseUrl + normalizedUrl;
+      }
       var tex = tw.loadTexture({
         extern: true,
         imgUrl: url,
@@ -1001,6 +1051,7 @@ tw.loadTexture = function (attrs) {
     // load texture from image url
     tex.image = new Image();
     tex.image.src = attrs.imgUrl;
+    console.log(tex.image.src)
 
     tex.image.onload = function (e) {
       gl.bindTexture(gl.TEXTURE_2D, tex.glTex);
